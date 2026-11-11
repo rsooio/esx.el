@@ -84,8 +84,11 @@
   (message "ESX results cleared"))
 
 (defun esx--clear-results-on-quit ()
-  "Clear result overlays when `C-g' runs `keyboard-quit'."
-  (when (eq this-command 'keyboard-quit)
+  "Clear result overlays when `C-g' runs `keyboard-quit'.
+Do nothing when a region is selected: `C-g' is then cancelling the
+selection, not dismissing evaluation results."
+  (when (and (eq this-command 'keyboard-quit)
+             (not (use-region-p)))
     (ignore-errors (esx--clear-result-overlays))))
 
 (add-hook 'pre-command-hook #'esx--clear-results-on-quit)
@@ -204,7 +207,8 @@ Results are shown inline; stdout/stderr go to the REPL."
                                (goto-char start)
                                (current-column)))))
        (lambda (message)
-         (esx--handle-eval-response buffer position tick message))))))
+         (esx--handle-eval-response buffer position tick message))
+       esx-eval-timeout))))
 
 (provide 'esx-eval)
 ;;; esx-eval.el ends here

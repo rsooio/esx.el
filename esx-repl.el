@@ -254,7 +254,8 @@ IS-ERROR selects the error face; RESULT selects the result face."
      (lambda (message)
        (when (buffer-live-p buffer)
          (with-current-buffer buffer
-           (esx-repl--handle-response message)))))))
+           (esx-repl--handle-response message))))
+     esx-eval-timeout)))
 
 (defun esx-repl--commit-input ()
   "Move the current input into the read-only output area."

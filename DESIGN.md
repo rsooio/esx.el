@@ -116,14 +116,19 @@ x + 1          => 42
 - `C-c C-o` / `C-c C-g` clears all result overlays manually
 - `C-g` is not bound: it is Emacs' quit character and is handled before
   local keymaps.  Instead, a `pre-command-hook` checks
-  `this-command = keyboard-quit` and clears result overlays; native quit
-  semantics are preserved
+  `this-command = keyboard-quit` and clears result overlays only when no
+  region is selected; native quit semantics are preserved
 - an eval result is discarded if the buffer changed while the request was in flight
 - stdout/stderr go to the REPL buffer, not the overlay
 - errors also go to the REPL
 
 The REPL buffer is created in the background if it does not exist; eval never
 switches windows.
+
+The server routes `node:repl` errors through the `handleError` option and
+returns an `ex` response with `status: ["eval-error", "done"]`.  The client
+also has an `esx-eval-timeout` watchdog so a missing response cannot leave the
+REPL waiting forever.
 
 ## REPL
 

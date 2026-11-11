@@ -12,11 +12,16 @@ diagnostics, and rename are left to the JS/TS LSP setup.
 | --- | --- | --- |
 | `C-M-x` | `esx-eval` | Evaluate the active region, or the top-level node at point. Results are shown inline. |
 | `C-c C-z` | `esx-jump` | Jump between the source buffer and the REPL. From a source buffer, sync the REPL namespace to the file namespace. |
-| `C-c C-o` / `C-c C-g` | `esx-clear-result-overlays` | Clear inline results in the current buffer. `C-g` is not bound; `pre-command-hook` detects `keyboard-quit` and clears overlays, so native quit semantics are preserved. |
+| `C-c C-o` / `C-c C-g` | `esx-clear-result-overlays` | Clear inline results in the current buffer. `C-g` is not bound; `pre-command-hook` detects `keyboard-quit` and clears overlays only when no region is selected, so native quit semantics are preserved. |
 | `RET` | `esx-repl-return` | Submit REPL input. |
 | `M-p` / `M-n` | history | REPL input history. |
 | `C-c M-o` | `esx-repl-clear-buffer` | Clear the REPL. |
 | `M-x esx-shutdown` | | Stop the server and kill the REPL buffer. |
+
+Evaluation errors are returned by the server as structured `ex` responses
+and shown as `Error: ...`; they do not print Node's `Uncaught` text.  An eval
+that receives no response is failed after `esx-eval-timeout` seconds
+(default 30), so the REPL cannot hang forever.
 
 Prefix arguments:
 

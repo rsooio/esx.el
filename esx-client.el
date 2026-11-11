@@ -39,6 +39,11 @@ For a local checkout, use something like
   :type 'number
   :group 'esx)
 
+(defcustom esx-eval-timeout 30
+  "Seconds to wait for an asynchronous eval response."
+  :type 'number
+  :group 'esx)
+
 (cl-defstruct (esx-connection (:constructor esx--make-connection))
   process
   buffer
@@ -113,12 +118,32 @@ JSON parsing uses symbol keys, while requests use string keys."
   "Build a request message with ID, OP, and PARAMS."
   (append (list (cons "id" id) (cons "op" op)) params))
 
-(defun esx-request (op params &optional callback)
+(defun esx-request (op params &optional callback timeout)
   "Send an asynchronous request OP with PARAMS.
-CALLBACK is called with each response message.  Return the request id."
+CALLBACK is called with each response message.  Return the request id.
+TIMEOUT defaults to `esx-request-timeout'."
   (let* ((connection (esx-ensure-connection))
-         (id (esx--next-id connection)))
-    (puthash id (or callback #'ignore) (esx-connection-pending connection))
+         (id (esx--next-id connection))
+         (callback (or callback #'ignore))
+         (timer (run-at-time
+                 (or timeout esx-request-timeout) nil
+                 (lambda ()
+                   (when (gethash id (esx-connection-pending connection))
+                     (remhash id (esx-connection-pending connection))
+                     (funcall callback
+                              (list (cons "id" id)
+                                    (cons "status" '("error" "done"))
+                                    (cons "ex"
+                                          (list (cons "name" "TimeoutError")
+                                                (cons "message"
+                                                      (format "ESX request timed out: %s" op))
+                                                (cons "stack" ""))))))))))
+    (puthash id
+             (lambda (message)
+               (when (esx--status-p message "done")
+                 (cancel-timer timer))
+               (funcall callback message))
+             (esx-connection-pending connection))
     (esx--send-message connection (esx--request-message id op params))
     id))
 

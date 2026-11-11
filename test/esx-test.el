@@ -252,5 +252,51 @@
        (quit nil))
      (should-not (esx-test--result-overlays (current-buffer))))))
 
+
+(ert-deftest esx-c-g-keeps-overlay-with-region ()
+  (skip-unless (treesit-language-available-p 'javascript))
+  (esx-test--with-server
+   (with-temp-buffer
+     (insert "1+1\n")
+     (js-ts-mode)
+     (goto-char (point-min))
+     (search-forward "1+1")
+     (esx-eval)
+     (should (esx-test--wait-for
+              (lambda ()
+                (seq-find (lambda (overlay) (overlay-get overlay 'esx-result))
+                          (overlays-in (point-min) (point-max))))))
+     (transient-mark-mode 1)
+     (goto-char (point-min))
+     (set-mark (point-max))
+     (activate-mark)
+     (should (use-region-p))
+     (let ((this-command 'keyboard-quit))
+       (esx--clear-results-on-quit))
+     (should (esx-test--result-overlays (current-buffer)))
+     (deactivate-mark)
+     (let ((this-command 'keyboard-quit))
+       (esx--clear-results-on-quit))
+     (should-not (esx-test--result-overlays (current-buffer))))))
+
+
+(ert-deftest esx-eval-timeout ()
+  (skip-unless (treesit-language-available-p 'javascript))
+  (esx-test--with-server
+   (let ((esx-eval-timeout 0.2))
+     (with-temp-buffer
+       (insert "slow\n")
+       (js-ts-mode)
+       (goto-char (point-min))
+       (search-forward "slow")
+       (esx-eval)
+       (should (esx-test--wait-for
+                (lambda ()
+                  (seq-find (lambda (overlay) (overlay-get overlay 'esx-result))
+                            (overlays-in (point-min) (point-max))))
+                2))
+       (should (string-match-p "timed out"
+                               (esx-test--overlay-text (current-buffer))))))))
+
 (provide 'esx-test)
 ;;; esx-test.el ends here

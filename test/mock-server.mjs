@@ -21,6 +21,8 @@ input.on("line", (line) => {
           status: ["eval-error", "done"],
           ex: { name: "Error", message: "boom", stack: "" },
         });
+      } else if (String(request.code).includes("slow")) {
+        // Deliberately do not answer, to test the client-side timeout.
       } else {
         send({ id, op: "out", out: "mock-out\n" });
         send({
