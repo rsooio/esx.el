@@ -184,5 +184,73 @@
          (should prompt)
          (should (< out prompt)))))))
 
+
+(ert-deftest esx-clear-result-overlays-command ()
+  (skip-unless (treesit-language-available-p 'javascript))
+  (esx-test--with-server
+   (with-temp-buffer
+     (insert "1+1\n")
+     (js-ts-mode)
+     (goto-char (point-min))
+     (search-forward "1+1")
+     (esx-eval)
+     (should (esx-test--wait-for
+              (lambda ()
+                (seq-find (lambda (overlay) (overlay-get overlay 'esx-result))
+                          (overlays-in (point-min) (point-max))))))
+     (esx-clear-result-overlays)
+     (should-not (esx-test--result-overlays (current-buffer))))))
+
+(ert-deftest esx-result-overlay-auto-clears-on-edit ()
+  (skip-unless (treesit-language-available-p 'javascript))
+  (esx-test--with-server
+   (with-temp-buffer
+     (insert "1+1\n")
+     (js-ts-mode)
+     (goto-char (point-min))
+     (search-forward "1+1")
+     (esx-eval)
+     (should (esx-test--wait-for
+              (lambda ()
+                (seq-find (lambda (overlay) (overlay-get overlay 'esx-result))
+                          (overlays-in (point-min) (point-max))))))
+     (goto-char (point-max))
+     (insert " ")
+     (should-not (esx-test--result-overlays (current-buffer))))))
+
+(ert-deftest esx-stale-result-is-discarded ()
+  (with-temp-buffer
+    (insert "1+1\n")
+    (let ((tick (buffer-chars-modified-tick))
+          (position (copy-marker (point-max))))
+      (goto-char (point-max))
+      (insert "changed")
+      (esx--handle-eval-response
+       (current-buffer)
+       position
+       tick
+       (list (cons 'status '("done"))
+             (cons 'value "42")))
+      (should-not (esx-test--result-overlays (current-buffer))))))
+
+
+(ert-deftest esx-c-g-clears-result-overlays ()
+  (skip-unless (treesit-language-available-p 'javascript))
+  (esx-test--with-server
+   (with-temp-buffer
+     (insert "1+1\n")
+     (js-ts-mode)
+     (goto-char (point-min))
+     (search-forward "1+1")
+     (esx-eval)
+     (should (esx-test--wait-for
+              (lambda ()
+                (seq-find (lambda (overlay) (overlay-get overlay 'esx-result))
+                          (overlays-in (point-min) (point-max))))))
+     (condition-case nil
+         (execute-kbd-macro (kbd "C-g"))
+       (quit nil))
+     (should-not (esx-test--result-overlays (current-buffer))))))
+
 (provide 'esx-test)
 ;;; esx-test.el ends here

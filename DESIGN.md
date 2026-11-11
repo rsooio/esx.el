@@ -108,9 +108,17 @@ x + 1          => 42
 ```
 
 - `after-string` overlay, no buffer modification
-- result face / error face
+- result face: light/dark grey background with a thin box, like CIDER
+- error face: orange-red / firebrick background
 - multiline results are flattened and truncated
 - old result overlays in the buffer are removed before a new eval
+- overlays are cleared automatically when the buffer text changes
+- `C-c C-o` / `C-c C-g` clears all result overlays manually
+- `C-g` is not bound: it is Emacs' quit character and is handled before
+  local keymaps.  Instead, a `pre-command-hook` checks
+  `this-command = keyboard-quit` and clears result overlays; native quit
+  semantics are preserved
+- an eval result is discarded if the buffer changed while the request was in flight
 - stdout/stderr go to the REPL buffer, not the overlay
 - errors also go to the REPL
 
@@ -143,9 +151,10 @@ external output; this design fixes it.
 | --- | --- |
 | `C-M-x` | `esx-eval` |
 | `C-c C-z` | `esx-jump` |
+| `C-c C-o` / `C-c C-g` | `esx-clear-result-overlays` |
 | `RET` | `esx-repl-return` |
 | `M-p` / `M-n` | REPL history |
-| `C-c C-o` | `esx-repl-clear-output` |
+| `C-c M-o` | `esx-repl-clear-buffer` |
 | `M-x esx-shutdown` | stop the server |
 
 Removed:

@@ -34,6 +34,8 @@
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-M-x") #'esx-eval)
     (define-key map (kbd "C-c C-z") #'esx-jump)
+    (define-key map (kbd "C-c C-o") #'esx-clear-result-overlays)
+    (define-key map (kbd "C-c C-g") #'esx-clear-result-overlays)
     map)
   "Keymap for `esx-mode'.")
 

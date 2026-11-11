@@ -24,14 +24,71 @@
   :prefix "esx-eval-")
 
 (defface esx-result-face
-  '((t :inherit font-lock-string-face))
+  '((((class color) (background light))
+     :inherit font-lock-string-face
+     :background "grey90"
+     :box (:line-width -1 :color "yellow"))
+    (((class color) (background dark))
+     :inherit font-lock-string-face
+     :background "grey10"
+     :box (:line-width -1 :color "black"))
+    (t :inherit font-lock-string-face))
   "Face for inline evaluation results."
+  :group 'esx-eval)
+
+(defface esx-error-overlay-face
+  '((((class color) (background light))
+     :background "orange red"
+     :foreground "white"
+     :extend t)
+    (((class color) (background dark))
+     :background "firebrick"
+     :foreground "white"
+     :extend t)
+    (t :inherit error))
+  "Face for inline evaluation errors."
   :group 'esx-eval)
 
 (defcustom esx-result-max-length 200
   "Maximum number of characters shown in an inline result."
   :type 'integer
   :group 'esx-eval)
+
+(defvar-local esx--result-overlays nil
+  "Result overlays created in this buffer.")
+
+(defun esx--ensure-result-hooks ()
+  "Install the buffer-local overlay cleanup hook."
+  (add-hook 'after-change-functions
+            #'esx--clear-result-overlays-on-change nil t))
+
+(defun esx--clear-result-overlays (&optional buffer)
+  "Remove result overlays from BUFFER (default: current buffer)."
+  (with-current-buffer (or buffer (current-buffer))
+    (dolist (overlay esx--result-overlays)
+      (when (overlayp overlay)
+        (delete-overlay overlay)))
+    (setq esx--result-overlays nil)
+    (dolist (overlay (overlays-in (point-min) (point-max)))
+      (when (overlay-get overlay 'esx-result)
+        (delete-overlay overlay)))))
+
+(defun esx--clear-result-overlays-on-change (&rest _)
+  "Clear result overlays after the buffer text changes."
+  (esx--clear-result-overlays))
+
+(defun esx-clear-result-overlays ()
+  "Clear inline evaluation results in the current buffer."
+  (interactive)
+  (esx--clear-result-overlays)
+  (message "ESX results cleared"))
+
+(defun esx--clear-results-on-quit ()
+  "Clear result overlays when `C-g' runs `keyboard-quit'."
+  (when (eq this-command 'keyboard-quit)
+    (ignore-errors (esx--clear-result-overlays))))
+
+(add-hook 'pre-command-hook #'esx--clear-results-on-quit)
 
 (defun esx--ensure-treesit ()
   "Signal an error unless the current buffer has a tree-sitter parser."
@@ -55,14 +112,6 @@ Use the active region, or the top-level node at point."
                                        '("program" "module")))))))
         (cons (treesit-node-start top) (treesit-node-end top))))))
 
-(defun esx--clear-result-overlays (buffer)
-  "Remove result overlays from BUFFER."
-  (when (buffer-live-p buffer)
-    (with-current-buffer buffer
-      (dolist (overlay (overlays-in (point-min) (point-max)))
-        (when (overlay-get overlay 'esx-result)
-          (delete-overlay overlay))))))
-
 (defun esx--result-text (value)
   "Format VALUE for an inline overlay."
   (let ((text (replace-regexp-in-string "[\n\r]+" " " value)))
@@ -74,25 +123,36 @@ Use the active region, or the top-level node at point."
   "Display VALUE at POSITION in BUFFER."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
+      (esx--ensure-result-hooks)
       (let ((overlay (make-overlay position position)))
         (overlay-put overlay 'after-string
                      (propertize (concat " => " (esx--result-text value))
                                  'face 'esx-result-face))
-        (overlay-put overlay 'esx-result t)))))
+        (overlay-put overlay 'esx-result t)
+        (push overlay esx--result-overlays)))))
 
 (defun esx--display-error (buffer position error)
   "Display ERROR at POSITION in BUFFER."
   (let ((text (or (esx--error-text error) "Evaluation error")))
     (when (buffer-live-p buffer)
       (with-current-buffer buffer
+        (esx--ensure-result-hooks)
         (let ((overlay (make-overlay position position)))
           (overlay-put overlay 'after-string
                        (propertize (concat " => " (esx--result-text text))
-                                   'face 'esx-repl-error-face))
-          (overlay-put overlay 'esx-result t))))))
+                                   'face 'esx-error-overlay-face))
+          (overlay-put overlay 'esx-result t)
+          (push overlay esx--result-overlays))))))
 
-(defun esx--handle-eval-response (buffer position message)
-  "Handle one eval response MESSAGE for BUFFER at POSITION."
+(defun esx--buffer-unchanged-p (buffer tick)
+  "Return non-nil when BUFFER is live and has not changed since TICK."
+  (and (buffer-live-p buffer)
+       (with-current-buffer buffer
+         (= tick (buffer-chars-modified-tick)))))
+
+(defun esx--handle-eval-response (buffer position tick message)
+  "Handle one eval response MESSAGE for BUFFER at POSITION.
+TICK is the buffer modification tick captured when the eval started."
   (when (esx--has message "out")
     (esx-repl--ensure-buffer)
     (esx-repl--insert-output (esx--get message "out")))
@@ -100,9 +160,13 @@ Use the active region, or the top-level node at point."
     (esx-repl--ensure-buffer)
     (esx-repl--insert-output (esx--get message "err") t))
   (when (esx--has message "value")
-    (esx--display-result buffer position (esx--get message "value")))
+    (if (esx--buffer-unchanged-p buffer tick)
+        (esx--display-result buffer position (esx--get message "value"))
+      (message "ESX: result discarded because the buffer changed")))
   (when (esx--has message "ex")
-    (esx--display-error buffer position (esx--get message "ex"))
+    (if (esx--buffer-unchanged-p buffer tick)
+        (esx--display-error buffer position (esx--get message "ex"))
+      (message "ESX: error discarded because the buffer changed"))
     (esx-repl--ensure-buffer)
     (esx-repl--insert-output
      (concat (or (esx--error-text (esx--get message "ex")) "Evaluation error")
@@ -123,6 +187,7 @@ Results are shown inline; stdout/stderr go to the REPL."
            (code (string-trim (buffer-substring-no-properties start end)))
            (buffer (current-buffer))
            (position (copy-marker end))
+           (tick (buffer-chars-modified-tick))
            (ns (if prefix (esx-current-ns) (esx-default-ns))))
       (when (string-empty-p code)
         (user-error "Nothing to evaluate"))
@@ -139,7 +204,7 @@ Results are shown inline; stdout/stderr go to the REPL."
                                (goto-char start)
                                (current-column)))))
        (lambda (message)
-         (esx--handle-eval-response buffer position message))))))
+         (esx--handle-eval-response buffer position tick message))))))
 
 (provide 'esx-eval)
 ;;; esx-eval.el ends here
