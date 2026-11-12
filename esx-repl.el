@@ -274,10 +274,11 @@ IS-ERROR selects the error face; RESULT selects the result face."
 (defun esx-repl--send-input ()
   "Send the current input and start a new output region."
   (let ((input (string-trim (esx-repl--current-input))))
+    (unless (string-empty-p input)
+      (esx-repl--add-history input))
+    (esx-repl--commit-input)
     (if (string-empty-p input)
         (esx-repl--insert-prompt)
-      (esx-repl--add-history input)
-      (esx-repl--commit-input)
       (esx-repl--send-eval input))))
 
 (defun esx-repl--command-p (input)

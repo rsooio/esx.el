@@ -29,6 +29,12 @@ Prefix arguments:
   file namespace.
 - `C-u C-c C-z` jumps to the REPL without changing its namespace.
 
+## Module resolution
+
+Relative imports resolve against the source file.  Bare imports (including
+`#package-imports`) resolve through Node's ESM resolver with the source file as
+the parent, so package `exports`/`imports` conditions are preserved.
+
 ## Namespace model
 
 ```text

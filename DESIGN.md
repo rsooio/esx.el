@@ -125,10 +125,12 @@ x + 1          => 42
 The REPL buffer is created in the background if it does not exist; eval never
 switches windows.
 
-The server routes `node:repl` errors through the `handleError` option and
-returns an `ex` response with `status: ["eval-error", "done"]`.  The client
-also has an `esx-eval-timeout` watchdog so a missing response cannot leave the
-REPL waiting forever.
+The server evaluates through `node:inspector` (`Runtime.evaluate` with
+`replMode: true`, then `Runtime.awaitPromise` for promise results), matching
+Node main's REPL evaluator.  It does not use `node:repl` or an async IIFE.
+Errors come from `exceptionDetails` and are returned as `ex` with
+`status: ["eval-error", "done"]`.  The client also has an `esx-eval-timeout`
+watchdog so a missing response cannot leave the REPL waiting forever.
 
 ## REPL
 
@@ -184,5 +186,7 @@ esx-ns.el        file-ns / buffer-ns / display
 
 - one server / one REPL buffer (no per-project registry yet)
 - no load-file, inspector, debugger, completion, eldoc, xref, diagnostics
-- `require("./x")` resolves relative to the server cwd, not the source file;
-  static `import` resolves against the file namespace
+- `require("./x")` resolves relative to the source file directory
+- bare static/dynamic imports resolve through Node's ESM resolver with the
+  source file as `parentURL` (`esx-modules://` + `registerHooks`), so package
+  `exports`/`imports` conditions and `#aliases` are preserved

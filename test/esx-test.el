@@ -163,6 +163,26 @@
    (esx-repl-set-ns "file:///tmp/foo.js")
    (should (equal "*ESX[foo.js]*" (buffer-name esx-repl-buffer)))))
 
+(ert-deftest esx-repl-empty-input-inserts-new-prompt ()
+  (let ((esx-repl-buffer nil)
+        (esx-repl-ns "user"))
+    (unwind-protect
+        (progn
+          (esx-repl--ensure-buffer)
+          (with-current-buffer esx-repl-buffer
+            (goto-char (point-max))
+            (esx-repl-return)
+            (should (equal "" (esx-repl--current-input)))
+            (should (equal "ESX REPL\nuser> \nuser> "
+                           (buffer-substring-no-properties (point-min) (point-max))))
+            (insert "   ")
+            (esx-repl-return)
+            (should (equal "" (esx-repl--current-input)))
+            (should (equal "ESX REPL\nuser> \nuser>    \nuser> "
+                           (buffer-substring-no-properties (point-min) (point-max))))))
+      (when (buffer-live-p esx-repl-buffer)
+        (kill-buffer esx-repl-buffer)))))
+
 (ert-deftest esx-source-output-goes-before-prompt ()
   (skip-unless (treesit-language-available-p 'javascript))
   (esx-test--with-server
