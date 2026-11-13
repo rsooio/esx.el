@@ -1,7 +1,7 @@
 # esx.el
 
-Minimal CIDER/SLIME-style Emacs client for [esx](../esx), an ESM REPL with
-file-based namespaces.
+Minimal CIDER/SLIME-style Emacs client for
+[esx](https://github.com/rsooio/esx), an ESM REPL with file-based namespaces.
 
 The package only does runtime interaction. Completion, eldoc, xref, hover,
 diagnostics, and rename are left to the JS/TS LSP setup.
@@ -43,7 +43,7 @@ buffer-ns = the REPL's current namespace, or a buffer-local override
 ```
 
 Default eval prefers `file-ns`; `C-u` prefers `buffer-ns`. See
-[DESIGN.md](DESIGN.md).
+[DESIGN.md](https://github.com/rsooio/esx.el/blob/master/DESIGN.md).
 
 ## REPL buffer
 
@@ -57,17 +57,30 @@ There is one REPL buffer. Its name follows the current namespace:
 It is an interactive CIDER/SLIME-style buffer with a prompt, editable input,
 history, and asynchronous output inserted before the prompt.
 
-## Setup
+## Installation
+
+Install from git with `use-package` + `:vc`:
 
 ```elisp
-(add-to-list 'load-path "~/esx.el")
-(require 'esx)
-
-(setq esx-server-command
-      '("node" "/home/rs/esx/cli.ts" "--server"))
-
-(esx-setup)   ; enable esx-mode in js-ts-mode / typescript-ts-mode
+(use-package esx
+  :vc (:url "https://github.com/rsooio/esx.el")
+  :custom
+  (esx-server-command '("node" "/path/to/esx/cli.ts" "--server"))
+  :config
+  (esx-setup))   ; enable esx-mode in js-ts-mode / typescript-ts-mode
 ```
+
+The package is the Emacs client only; the server lives in
+[esx](https://github.com/rsooio/esx). Clone it and install its dependencies:
+
+```sh
+git clone https://github.com/rsooio/esx
+cd esx && npm install
+```
+
+Point `esx-server-command` at that checkout as shown above, or run
+`npm link` in the checkout to provide an `esx` executable and keep the
+default `("esx" "--server")`.
 
 Then `M-x esx-ensure` or `C-c C-z` starts the server and opens the REPL.
 
@@ -91,3 +104,7 @@ Then `M-x esx-ensure` or `C-c C-z` starts the server and opens the REPL.
 make test     # ERT tests against a mock server
 make compile  # byte-compile
 ```
+
+## License
+
+GPLv3, see [LICENSE](LICENSE).
