@@ -352,6 +352,19 @@ With prefix argument FORCE, send even if the input looks incomplete."
 
 (add-hook 'esx-output-functions #'esx-repl--output-hook)
 
+(defun esx-repl--indent-line ()
+  "Indent the current line as JavaScript, except on the prompt line.
+The prompt is read-only text at the start of the input line, so
+JavaScript indentation would move point into it."
+  (unless (and (markerp esx-repl-prompt-start)
+               (let* ((prompt (marker-position esx-repl-prompt-start))
+                      (beg (min prompt (point)))
+                      (end (max prompt (point))))
+                 (not (string-match-p
+                       "\n"
+                       (buffer-substring-no-properties beg end)))))
+    (js-indent-line)))
+
 ;;;###autoload
 (define-derived-mode esx-repl-mode js-mode "ESX-REPL"
   "Major mode for interacting with an esx server."
@@ -359,6 +372,7 @@ With prefix argument FORCE, send even if the input looks incomplete."
   (setq-local esx-repl-history-index 0)
   (setq-local truncate-lines nil)
   (setq-local buffer-read-only nil)
+  (setq-local indent-line-function #'esx-repl--indent-line)
   (esx-repl--markers))
 
 ;;;###autoload

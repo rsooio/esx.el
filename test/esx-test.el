@@ -183,6 +183,22 @@
       (when (buffer-live-p esx-repl-buffer)
         (kill-buffer esx-repl-buffer)))))
 
+(ert-deftest esx-repl-brackets-do-not-move-point ()
+  (let ((esx-repl-buffer nil)
+        (esx-repl-ns "user"))
+    (unwind-protect
+        (progn
+          (esx-repl--ensure-buffer)
+          (with-current-buffer esx-repl-buffer
+            (goto-char (point-max))
+            (dolist (char (list ?\( ?\) ?\{ ?\}))
+              (let ((last-command-event char))
+                (self-insert-command 1))
+              (should (= (point) (point-max))))
+            (should (equal "(){}" (esx-repl--current-input)))))
+      (when (buffer-live-p esx-repl-buffer)
+        (kill-buffer esx-repl-buffer)))))
+
 (ert-deftest esx-source-output-goes-before-prompt ()
   (skip-unless (treesit-language-available-p 'javascript))
   (esx-test--with-server
